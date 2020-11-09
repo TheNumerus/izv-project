@@ -1,9 +1,11 @@
 import errno
-from typing import *
+import pickle
+from typing import Tuple, List
 
 import requests
 import os
 import re
+import gzip
 import numpy as np
 from zipfile import ZipFile
 from bs4 import BeautifulSoup
@@ -32,7 +34,7 @@ _data_header_types = [
     ["Číslo cesty",                               "i4"],
     ["Datum nehody",                              "datetime64[D]"],
     ["Den v týdnu",                               "i1"],
-    ["Čas nehody",                                "2i1"],
+    ["Čas nehody",                                "i2"],
     ["Druh nehody",                               "i1"],
     ["Druh srážky",                               "i1"],
     ["Druh překážky",                             "i1"],
@@ -102,6 +104,7 @@ class DataDownloader:
         self.cache = dict()
 
     def download_data(self):
+        """Downloads all zips with data"""
         res = requests.get(self.url, headers={'User-Agent': 'Mozilla 5.0'})
         soup = BeautifulSoup(res.text, 'html.parser')
 
@@ -117,10 +120,7 @@ class DataDownloader:
             filename = os.path.join(self.folder, name)
 
             if os.path.isfile(filename):
-                print(name, "already in cache")
                 continue
-
-            print("downloading", name)
 
             file_url = self.url + link['href']
             file = requests.get(file_url, headers={'User-Agent': 'Mozilla 5.0'})
@@ -128,12 +128,12 @@ class DataDownloader:
             f = open(filename, 'wb')
             f.write(file.content)
 
-    def parse_region_data(self, region):
+    def parse_region_data(self, region) -> Tuple[List[str], List[np.ndarray]]:
+        """Returns parsed data for one region."""
         parsed_data = []
         parsed_ids = set()
-        types = ["U8" for x in range(65)]
 
-        print(f'parsing region {region}')
+        self.download_data()
 
         # sort files from newest to oldest
         pat = re.compile(r"(\d{2})?-?(\d{4})")
@@ -147,7 +147,9 @@ class DataDownloader:
             else:
                 return int(year) * 100 + int(month)
 
-        sorted_files = sorted(os.listdir(self.folder), key=sort_fn, reverse=True)
+        # ignore all pickles
+        zips = list(filter(lambda x: "zip" in x, os.listdir(self.folder)))
+        sorted_files = sorted(zips, key=sort_fn, reverse=True)
 
         for file in sorted_files:
             fullpath = os.path.join(self.folder, file)
@@ -164,31 +166,21 @@ class DataDownloader:
                             parsed_data.append(columns)
 
         numpy_arrays = []
-        # TODO create arrays
+
         types = list(map(lambda x: x[1], _data_header_types))
         for x in range(65):
             numpy_arrays.append(np.empty([len(parsed_data)], dtype=types[x]))
 
-        rows_with_default = [2, 3, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45]
+        rows_with_default = [2, 3, 5] + [x for x in range(7, 35)] + [x for x in range(36, 46)]
         rows_with_default_float = [46, 47, 48, 49, 50, 51]
-        rows_with_strip_str = [4, 35, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 64]
+        rows_with_strip_str = [4, 6, 35, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 64]
 
-        # TODO clean up data
         for column, accident in enumerate(parsed_data):
             for row, data in enumerate(accident):
                 if row in rows_with_default and data == "":
                     data = -1
                 elif row in rows_with_strip_str:
                     data = data.strip('"')
-                elif row == 6:
-                    data = data.strip('"')
-                    hour = int(data) // 100
-                    if hour == 25:
-                        hour = -1
-                    minute = int(data) % 100
-                    if minute == 60:
-                        minute = -1
-                    data = (hour, minute)
                 elif row in rows_with_default_float:
                     data = data.strip('"')
                     if len(data) == 0:
@@ -202,27 +194,53 @@ class DataDownloader:
 
         return header, numpy_arrays
 
-    def get_list(self, regions: list = None):
+    def get_list(self, regions: list = None) -> Tuple[List[str], List[np.ndarray]]:
+        """Returns parsed data for selected regions. If `regions` is None, returns all regions"""
         header = list(map(lambda x: x[0], _data_header_types))
-        data = (header, [[] for x in range(65)])
+        data = (header, [])
+
+        if regions is None:
+            regions = list(_region_to_file.keys())
 
         for region in regions:
-            print(f'getting data for region {region}')
-            if region in self.cache.keys():
-                data[1].extend(self.cache[region][1])
-            else:
-                cached_file = self.cache_filename.format(region)
+            # add data to program cache
+            if region not in self.cache.keys():
+                cached_file = os.path.join(self.folder, self.cache_filename.format(region))
+
                 if os.path.isfile(cached_file):
-                    # TODO read cache
-                    pass
+                    cache = gzip.open(cached_file, 'rb')
+                    self.cache[region] = pickle.load(cache)
                 else:
                     self.cache[region] = self.parse_region_data(region)
-                    # TODO save cached data to disk
-                    for x in range(65):
-                        data[1][x].extend(self.cache[region][1][x])
+
+                    cache = gzip.open(cached_file, 'wb')
+                    pickle.dump(self.cache[region], cache)
+
+            # add to output
+            if len(data[1]) == 0:
+                data = (header, self.cache[region][1])
+            else:
+                for x in range(65):
+                    data[1][x] = np.append(data[1][x], self.cache[region][1][x])
         return data
 
 
 if __name__ == "__main__":
     dd = DataDownloader()
-    dd.get_list(['MSK', 'JHM', 'OLK'])
+    data = dd.get_list(['MSK', 'JHM', 'OLK'])
+
+    print(f"Staženy data pro regiony 'MSK', 'JHM', 'OLK':\n")
+
+    crashes_per_reg = {}
+    for reg in data[1][0]:
+        if reg not in crashes_per_reg:
+            crashes_per_reg[reg] = 1
+        else:
+            crashes_per_reg[reg] += 1
+
+    for key, value in crashes_per_reg.items():
+        print(f"Nehod v regionu {key}: {value}")
+
+    print("\nDatové sloupce:\n")
+    for name in data[0]:
+        print(name)
