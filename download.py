@@ -10,6 +10,7 @@ import numpy as np
 from zipfile import ZipFile
 from bs4 import BeautifulSoup
 
+# map of regions to filename
 _region_to_file = {
     "PHA": "00.csv",
     "STC": "01.csv",
@@ -27,6 +28,7 @@ _region_to_file = {
     "KVK": "19.csv",
 }
 
+# types and their meaning
 _data_header_types = [
     ["Kraj",                                      "U3"],
     ["ID nehody",                                 "U14"],
@@ -97,6 +99,7 @@ _data_header_types = [
 
 
 class DataDownloader:
+    """Handles downloading and parsing of police data"""
     def __init__(self, url="https://ehw.fit.vutbr.cz/izv/", folder="data", cache_filename="data_{}.pkl.gz"):
         self.cache_filename = cache_filename
         self.folder = folder
@@ -128,8 +131,11 @@ class DataDownloader:
             f = open(filename, 'wb')
             f.write(file.content)
 
-    def parse_region_data(self, region) -> Tuple[List[str], List[np.ndarray]]:
-        """Returns parsed data for one region."""
+    def parse_region_data(self, region: str) -> Tuple[List[str], List[np.ndarray]]:
+        """Returns parsed data for one region.
+
+        :param region: region to parse
+        """
         parsed_data = []
         parsed_ids = set()
 
@@ -186,7 +192,10 @@ class DataDownloader:
                     if len(data) == 0:
                         data = float('nan')
                     else:
-                        data = float(data.replace(',', '.'))
+                        try:
+                            data = float(data.replace(',', '.'))
+                        except:
+                            data = float('nan')
 
                 numpy_arrays[row][column] = data
 
@@ -194,8 +203,11 @@ class DataDownloader:
 
         return header, numpy_arrays
 
-    def get_list(self, regions: list = None) -> Tuple[List[str], List[np.ndarray]]:
-        """Returns parsed data for selected regions. If `regions` is None, returns all regions"""
+    def get_list(self, regions: List[str] = None) -> Tuple[List[str], List[np.ndarray]]:
+        """Returns parsed data for selected regions.
+
+        :param regions: regions to return. If its None, returns all regions
+        """
         header = list(map(lambda x: x[0], _data_header_types))
         data = (header, [])
 
