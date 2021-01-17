@@ -93,11 +93,11 @@ def plot_cluster(gdf: geopandas.GeoDataFrame, fig_location: str = None, show_fig
 
     df_centers = pd.DataFrame(clusters.cluster_centers_)
     df_centers['counts'] = counts
-    print(df_centers)
+    df_centers['counts_size'] = counts / 10
     gdf_centers = geopandas.GeoDataFrame(df_centers, geometry=geopandas.points_from_xy(df_centers[0], df_centers[1]), crs="EPSG:5514")
 
     gdf.plot(ax=ax, markersize=2, color='grey', alpha=0.1)
-    gdf_centers.plot(ax=ax, column='counts', markersize=400, alpha=0.8, legend=True)
+    gdf_centers.plot(ax=ax, column='counts', markersize='counts_size', alpha=0.5, legend=True)
 
     ax.set_axis_off()
     fig.set_tight_layout(True)
@@ -108,5 +108,5 @@ def plot_cluster(gdf: geopandas.GeoDataFrame, fig_location: str = None, show_fig
 
 if __name__ == "__main__":
     gdf = make_geo(pd.read_pickle("data/accidents.pkl.gz"))
-    # plot_geo(gdf, "geo1.png", True)
+    plot_geo(gdf, "geo1.png", True)
     plot_cluster(gdf, "geo2.png", True)

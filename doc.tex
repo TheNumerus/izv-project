@@ -1,0 +1,57 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[total={17cm,25cm}]{geometry}
+\usepackage[czech]{babel}
+\usepackage{graphicx}
+\usepackage{fontspec}
+\usepackage{tikz}
+\usepackage{multicol,multirow,booktabs}
+\usepackage{caption}
+\usepackage{hyperref}
+\setmainfont[Ligatures=TeX]{Roboto Light}
+
+\begin{document}
+\large{}
+Na českých silnicích dochází k pravidelným nehodám. 
+17\%\footnote{V databázi je 431971 nehod po filtraci. $74100/431971 \approx 17\%$.} všech nehod se stane mezi dvacátou a šestou hodinou ranní. Jedním z faktorů, které tomu napomáhají je špatná viditelnost v nočních hodinách.
+23\%\footnote{101101 nehod vyhovovalo požadavkům. $101101/431971 \approx 23\%$} všech nehod se stane za špatné viditelnosti. Avšak špatná viditelnost souvisí s nočními hodinami.
+Mezi dvacátou a šestou hodinou je přes 40\%\footnote{44077 nehod vyhovovalo požadavkům. $44077/101101 \approx 44\%$} nehod za špatné viditelnosti. 
+
+\vspace{10pt}
+\normalsize
+\begin{figure}[h]
+Graf nehod v danou hodinu
+\includegraphics[width=\textwidth]{fig.png}
+\centering
+\end{figure}
+\begin{figure}[h]
+\centering
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+hodiny & 0:00 - 6:00 & 6:00 - 12:00 & 12:00 - 18:00 & 18:00 - 0:00\\
+\midrule
+celkem nehod & 40262 & 138134 & 162649 & 90926\\
+špatná viditelnost & 23636 & 18927 & 17488 & 41050\\
+\bottomrule
+\end{tabular}
+\caption*{Stejná data v tabulkové formě}
+\end{figure}
+
+\vfill{}
+\vfill{}
+{\centering
+Na základě těchto dat lze jen doporučit\\
+\vspace{10pt}
+
+\Huge{}
+Dávej pozor na cestu při pozdním návratu domů!
+}
+\vfill{}
+\tikz[remember picture,overlay] \node[opacity=0.1,inner sep=0pt, shift={(5,-8)}] at (current page.center){
+    \includegraphics[width=0.4\paperwidth]{cloudy.pdf}
+};
+\normalsize
+\\
+Zdroj dat infografiky:\hspace{5pt} {\url{https://www.policie.cz/clanek/statistika-nehodovosti-900835.aspx}}
+\clearpage
+\end{document}
